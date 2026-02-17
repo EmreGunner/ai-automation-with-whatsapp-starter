@@ -1,21 +1,20 @@
-# 🚀 AI Automation Workshop Kit
+# 🤖 My AI & WhatsApp Automation Kit
 
-Welcome to the workshop! This kit contains everything you need to build AI Agents and WhatsApp Bots.
+This kit combines **n8n AI Starter Kit** and **Evolution API** into a single-command setup. Perfect for building AI-powered WhatsApp bots.
 
-## What is inside?
-1. **n8n:** The workflow automation tool.
-2. **Ollama:** Your local AI Brain.
-3. **Qdrant:** The memory for your AI.
-4. **Evolution API:** For connecting to WhatsApp.
+## 📦 What's Included?
+- **n8n (AI Edition):** The brain of your automation.
+- **Evolution API:** The bridge to WhatsApp.
+- **Ollama:** Run LLMs like Llama 3.2 locally.
+- **Qdrant:** Vector memory for your AI.
+- **Postgres & Redis:** Reliable data storage.
 
-## 🛠️ Installation
+## 🚀 One-Click Setup (DigitalOcean)
+When creating your Droplet, paste the script from `setup.sh` into the **User Data** field.
 
-### Option 1: DigitalOcean (Easiest)
-Copy the `setup.sh` script provided in the workshop and paste it into the "User Data" field when creating your droplet.
+## 🛠️ Manual Installation
+If you are running this on your own Ubuntu server:
 
-### Option 2: Run Manually
-If you already have Docker installed:
-```bash
-git clone [https://github.com/YOUR_USERNAME/ai-automation-starter.git](https://github.com/YOUR_USERNAME/ai-automation-starter.git)
-cd ai-automation-starter
-docker compose up -d
+1. **Clone this repo:**
+   ```bash
+   git clone [https://github.com/YOUR_USERNAME/YOUR_REPO.git](https://github.com/YOUR_USERNAME/YOUR_REPO.git) && cd YOUR_REPO
