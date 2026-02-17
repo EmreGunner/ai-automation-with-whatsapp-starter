@@ -1,0 +1,115 @@
+version: '3.8'
+
+volumes:
+  n8n_storage:
+  postgres_storage:
+  qdrant_storage:
+  ollama_storage:
+  evolution_store:
+  evolution_instances:
+
+networks:
+  workshop_net:
+
+services:
+  # ---------------------------
+  # PART 1: n8n AI Starter Kit
+  # ---------------------------
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
+      - WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+    links:
+      - postgres
+      - qdrant
+      - ollama
+    volumes:
+      - n8n_storage:/home/node/.n8n
+      - ./n8n/backup:/backup
+      - ./shared:/data/shared
+    networks:
+      - workshop_net
+
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - postgres_storage:/var/lib/postgresql/data
+    networks:
+      - workshop_net
+
+  qdrant:
+    image: qdrant/qdrant
+    restart: always
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    networks:
+      - workshop_net
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_storage:/root/.ollama
+    networks:
+      - workshop_net
+
+  # ---------------------------
+  # PART 2: Evolution API
+  # ---------------------------
+  evolution_api:
+    image: atendai/evolution-api:latest
+    restart: always
+    ports:
+      - "8081:8080" # Maps internal 8080 to external 8081
+    environment:
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@evolution_postgres:5432/evolution
+    networks:
+      - workshop_net
+    depends_on:
+      - evolution_postgres
+      - evolution_redis
+
+  evolution_postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=evolution
+    volumes:
+      - evolution_store:/var/lib/postgresql/data
+    ports:
+      - "5433:5432" # Maps internal 5432 to external 5433 to avoid conflict
+    networks:
+      - workshop_net
+
+  evolution_redis:
+    image: redis:alpine
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6380:6379" # Maps internal 6379 to external 6380
+    networks:
+      - workshop_net
