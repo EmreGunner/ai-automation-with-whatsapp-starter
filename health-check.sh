@@ -388,4 +388,4 @@ else
   echo "  • Check containers:   cd /opt/workshop && docker compose ps"
   echo "  • View all logs:      cd /opt/workshop && docker compose logs"
   exit 1
-fihealth-check.sh
+fi
