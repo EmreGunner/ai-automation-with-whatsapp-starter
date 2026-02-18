@@ -325,9 +325,20 @@ log_success "Containers launched, waiting for health checks..."
 sleep 20
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 8: Validate All Services
+# STEP 8: Download Llama 3.2 Model
 # ══════════════════════════════════════════════════════════════════════════════
-log "STEP 8/9: Validating services..."
+log "STEP 8/10: Downloading Llama 3.2 model (~2GB, 5-10 min)..."
+
+docker compose exec -T ollama ollama pull llama3.2 >> "$LOG_FILE" 2>&1 &
+OLLAMA_PID=$!
+
+log "Llama 3.2 downloading in background (PID: $OLLAMA_PID)"
+log "You can check progress: docker compose logs ollama -f"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STEP 9: Validate All Services
+# ══════════════════════════════════════════════════════════════════════════════
+log "STEP 9/10: Validating services..."
 
 validate_service() {
   local SERVICE=$1
@@ -375,9 +386,9 @@ fi
 log_success "All 8 services validated successfully"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 9: Create Auto-Status Dashboard for SSH Login
+# STEP 10: Create Auto-Status Dashboard for SSH Login
 # ══════════════════════════════════════════════════════════════════════════════
-log "STEP 9/9: Setting up auto-status dashboard..."
+log "STEP 10/10: Setting up auto-status dashboard..."
 
 cat > /usr/local/bin/workshop-status << 'STATUS_EOF'
 #!/bin/bash
@@ -527,6 +538,9 @@ log_success "n8n:              http://${PUBLIC_IP}:5678"
 log_success "Evolution Manager: http://${PUBLIC_IP}:8082"
 log_success "Ollama:           http://${PUBLIC_IP}:11434"
 log_success "Qdrant:           http://${PUBLIC_IP}:6333"
+log ""
+log "Llama 3.2 model is downloading in background."
+log "Check progress: docker compose logs ollama -f"
 log ""
 log "Next time you SSH in, you'll see the service status automatically."
 log "Run 'workshop-status' anytime to check service health."
