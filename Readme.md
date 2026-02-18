@@ -1,197 +1,425 @@
 # 🤖 AI + WhatsApp Automation Starter Kit
 
-A one-click Docker stack that deploys a complete AI workflow engine with professional WhatsApp automation — ready in under 10 minutes.
+**Deploy a complete AI workflow engine with professional WhatsApp automation in under 15 minutes.**
 
-Built on the [n8n-io/self-hosted-ai-starter-kit](https://github.com/n8n-io/self-hosted-ai-starter-kit), extended with **Evolution API v2** for WhatsApp integration.
+One-click setup on DigitalOcean. No coding required. Built on [n8n-io/self-hosted-ai-starter-kit](https://github.com/n8n-io/self-hosted-ai-starter-kit), extended with **Evolution API v2** for enterprise WhatsApp integration.
 
 ---
 
-## ✅ What's Included
+## 📦 What's Inside
 
 | Service | Purpose | Port |
 |---|---|---|
-| **n8n** | Workflow automation with 400+ integrations and AI nodes | 5678 |
-| **Evolution API v2** | WhatsApp bridge (send/receive messages, webhooks, media) | 8081 |
-| **Evolution Manager** | Web UI for managing WhatsApp instances and QR scanning | 8082 |
-| **Ollama** | Local LLM runner — Llama 3.2 runs privately, no API key | 11434 |
-| **Qdrant** | Vector database for AI long-term memory | 6333 (internal) |
-| **PostgreSQL ×2** | Separate isolated databases for n8n and Evolution API | internal only |
-| **Redis** | Cache layer for Evolution API session management | internal only |
+| **n8n** | Workflow automation with 400+ integrations | 5678 |
+| **Evolution API** | WhatsApp bridge (send/receive messages, media, webhooks) | 8081 |
+| **Evolution Manager** | Web UI for managing WhatsApp instances | 8082 |
+| **Ollama** | Local LLM (Llama 3.2) — no API keys needed | 11434 |
+| **Qdrant** | Vector database for AI memory | 6333 |
+| **PostgreSQL ×2** | Isolated databases (n8n + Evolution) | internal |
+| **Redis** | Session cache for Evolution API | internal |
 
 ---
 
-## ⭐ What You Can Build
+## 🎯 What You Can Build
 
-- **AI WhatsApp Chatbot** — Answer customer questions 24/7 using your local LLM
-- **PDF Summariser via WhatsApp** — Send a document link, receive a summary on WhatsApp
-- **Appointment Booking Bot** — Customers book via WhatsApp, n8n writes to your calendar
-- **Lead Qualification Agent** — Qualify inbound leads and push them to your CRM
-- **Internal IT Helpdesk Bot** — Handle employee requests through a company WhatsApp number
-- **Broadcast Automation** — Schedule and send messages to segmented contact lists
+- **AI Customer Support Bot** — Answer questions 24/7 via WhatsApp using your local LLM
+- **Document Summarizer** — Send PDF links, receive summaries on WhatsApp
+- **Appointment Booking** — Let customers book through WhatsApp, auto-sync to calendar
+- **Lead Qualifier** — Screen inbound leads and push hot ones to CRM
+- **IT Helpdesk** — Internal employee support through company WhatsApp
+- **Broadcast Campaigns** — Schedule messages to segmented contact lists
 
 ---
 
 ## 🚀 One-Click Setup on DigitalOcean
 
-### Step 1 — Create a Droplet
+### Step 1: Create Your Droplet
 
-1. Log in to [DigitalOcean](https://cloud.digitalocean.com) and click **Create → Droplets**
-2. **OS:** Choose `Ubuntu 24.04 (LTS) x64`
-3. **Plan:** Shared CPU → **Basic**
-4. **Size:** `4 GB RAM / 2 vCPUs` (~$24/month)
+1. Go to [DigitalOcean](https://cloud.digitalocean.com) → **Create → Droplets**
+2. **Choose an OS:** Select `Ubuntu 24.04 (LTS) x64`
+3. **Choose a Plan:** 
+   - Select **Shared CPU** → **Basic**
+   - Choose **4 GB RAM / 2 vCPUs** (~$24/month)
+   
+   > ⚠️ **Don't go smaller!** Llama 3.2 needs ~3.5 GB RAM. Droplets with 2 GB will crash.
 
-> ⚠️ **RAM Warning:** Ollama (the AI engine) requires at least 3.5 GB of RAM to run the Llama 3.2 model. A droplet with less than 4 GB RAM will crash. Do not go smaller.
+4. **Choose Region:** Pick the datacenter closest to you
+5. **Authentication:** Add your SSH key or set a root password
 
-5. **Region:** Choose the city closest to you
-6. **Authentication:** Add an SSH key, or use a root password (password is fine for a workshop)
+### Step 2: Add the Setup Script
 
-### Step 2 — Paste the Setup Script
-
-1. Still on the Droplet creation page, scroll down to **Advanced Options**
-2. Check the box: ✅ `Add Initialization Scripts (User Data)`
-3. A text box appears. Paste **exactly** this — nothing more, nothing less:
+1. Scroll down to **Advanced Options**
+2. Check: ✅ **Add Initialization Scripts (User Data)**
+3. Paste this in the text box:
 
 ```bash
 #!/bin/bash
 curl -fsSL https://raw.githubusercontent.com/EmreGunner/ai-automation-with-whatsapp-starter/main/setup.sh | bash
 ```
 
-### Step 3 — Launch and Wait
+4. Click **Create Droplet**
 
-1. Click **Create Droplet**
-2. Wait **7–10 minutes**. The script automatically:
-   - Opens firewall ports
-   - Installs Docker
-   - Clones this repository
-   - Pulls all Docker images (~1.5 GB)
-   - Starts all 7 services
-3. Once the Droplet shows **Active**, copy your **Droplet IP address**
+### Step 3: Wait for Setup
 
----
+The setup takes **15-20 minutes**. The script automatically:
+- Opens firewall ports
+- Installs Docker
+- Pulls all images (~5 GB)
+- Starts all 8 services
+- Validates everything works
 
-## 🔗 Accessing Your Tools
-
-Replace `YOUR_IP` with your actual Droplet IP in every URL below.
+When the droplet shows **Active**, copy your **Droplet IP** — you'll need it for every URL below.
 
 ---
 
-### 1. n8n — Automation Builder
+## ✅ Step-by-Step Setup & Testing
 
-**URL:** `http://YOUR_IP:5678`
+### 1. Verify Services Are Running
 
-On your first visit, n8n shows an **owner registration screen**. This is normal — fill in any email and password to create your admin account. No email verification required. You land directly on the workflow canvas.
+**Option A: Via Health Check (Recommended)**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/EmreGunner/ai-automation-with-whatsapp-starter/main/health-check.sh | bash
+```
+
+You should see all green checkmarks ✓.
+
+**Option B: Via SSH**
+
+```bash
+ssh root@YOUR_DROPLET_IP
+
+# You'll see the status dashboard automatically on login:
+#   ● n8n (http://64.23.165.226:5678)
+#   ● evolution_manager (http://64.23.165.226:8082)
+#   ● ollama (http://64.23.165.226:11434)
+#   ...all green
+```
+
+If services aren't running:
+
+```bash
+cd /opt/workshop
+docker compose ps        # Check status
+docker compose up -d     # Start if needed
+```
 
 ---
 
-### 2. Evolution Manager — WhatsApp Control Panel
+### 2. Test Ollama (AI Engine)
 
-**URL:** `http://YOUR_IP:8082`
+Open in your browser:
+```
+http://YOUR_DROPLET_IP:11434
+```
 
-On the login screen enter:
-- **Server URL:** `http://YOUR_IP:8081`
-- **Global API Key:** `workshop-key-xyz`
+You should see: `Ollama is running`
 
-To connect a WhatsApp number:
-1. Click **Instances** → **Create Instance** → give it a name (e.g. `workshop`)
-2. Click **Connect** — a QR code appears
-3. On your phone: **WhatsApp → Settings → Linked Devices → Link a Device**
-4. Scan the QR code. The instance status turns green ✅
+**Test the AI with a real question:**
+
+```bash
+ssh root@YOUR_DROPLET_IP
+
+# Ask Llama 3.2 a question
+curl -X POST http://localhost:11434/api/generate -d '{
+  "model": "llama3.2",
+  "prompt": "Explain quantum computing in one sentence",
+  "stream": false
+}'
+```
+
+Response example:
+```json
+{
+  "model": "llama3.2",
+  "response": "Quantum computing harnesses quantum mechanics to process information..."
+}
+```
+
+If you get `model not found`, Llama 3.2 is still downloading. Wait 5 minutes and try again. Check progress:
+
+```bash
+docker compose logs ollama --tail=20
+```
 
 ---
 
-### 3. Ollama — Local AI Engine
+### 3. Set Up Evolution Manager (WhatsApp)
 
-**URL:** `http://YOUR_IP:11434`
+#### 3.1 Log In to Evolution Manager
 
-If you see `"Ollama is running"` in the browser, the AI engine is online. Llama 3.2 downloads automatically in the background on first start (~2 GB, takes about 5 minutes).
+Open in your browser:
+```
+http://YOUR_DROPLET_IP:8082
+```
+
+You'll see a login screen. Enter:
+
+| Field | Value |
+|---|---|
+| **Server URL** | `http://YOUR_DROPLET_IP:8081` |
+| **API Key Global** | `workshop-key-xyz` |
+
+Click **Connect**.
+
+> **Why these values?**
+> - Server URL points to Evolution API (the backend that connects to WhatsApp)
+> - `workshop-key-xyz` is the default API key set in docker-compose.yml
+
+#### 3.2 Create a WhatsApp Instance
+
+1. Click **Instances** (left sidebar)
+2. Click **+ Create Instance**
+3. Enter:
+   - **Instance Name:** `workshop` (or any name you like)
+   - Leave other settings as default
+4. Click **Create**
+
+#### 3.3 Connect Your WhatsApp Number
+
+1. Find your new instance in the list
+2. Click **Connect**
+3. A QR code appears
+4. On your phone:
+   - Open WhatsApp
+   - Tap **Settings → Linked Devices**
+   - Tap **Link a Device**
+   - Scan the QR code on your screen
+
+Within 5 seconds, the status changes to **Connected** ✅ (green circle).
+
+> **Important:** This links WhatsApp to Evolution API, NOT WhatsApp Business API. You're using your personal/business WhatsApp number. Messages will appear in both the phone app and Evolution API.
+
+#### 3.4 Test Sending a Message
+
+1. Still in Evolution Manager, click your instance name
+2. Click **Send Message** tab
+3. Enter:
+   - **Number:** Your own phone number in international format (e.g., `+14155551234`)
+   - **Message:** `Test from Evolution API`
+4. Click **Send**
+
+Check your phone — you should receive the message instantly.
 
 ---
 
-## 🔧 Internal Docker Networking — Important
+### 4. Test Evolution API Directly (Optional)
 
-> This is the most common source of errors. Please read carefully.
+If you want to send messages programmatically (useful for n8n workflows later):
 
-When building workflows inside n8n, **never use the public IP** to connect services together. Use the internal Docker service names instead. All traffic stays inside the private network — faster, more secure, no extra cost.
+```bash
+# Send a message via curl
+curl -X POST http://YOUR_DROPLET_IP:8081/message/sendText/workshop \
+  -H "apikey: workshop-key-xyz" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "number": "+14155551234",
+    "text": "Hello from Evolution API via curl!"
+  }'
+```
 
-| Connecting to | ❌ Don't use | ✅ Use this in n8n |
+Replace:
+- `workshop` with your instance name
+- `+14155551234` with your phone number
+
+You should receive the message on WhatsApp.
+
+---
+
+### 5. Set Up n8n (Automation Builder)
+
+#### 5.1 Create Your Owner Account
+
+Open in your browser:
+```
+http://YOUR_DROPLET_IP:5678
+```
+
+First visit shows the **owner registration** screen. This is normal. Fill in:
+- **Email:** Any email (no verification needed)
+- **Password:** Create a strong password
+
+Click **Continue** — you land on the workflow canvas.
+
+#### 5.2 Test n8n with a Simple Workflow
+
+Let's build a "Hello World" workflow to test everything works:
+
+1. Click **+ Add first step**
+2. Search for **Manual Trigger** → Select it
+3. Click **+** button to add another node
+4. Search for **HTTP Request** → Select it
+5. Configure the HTTP Request node:
+   - **Method:** POST
+   - **URL:** `http://evolution_api:8080/message/sendText/workshop`
+   - Click **Add Header**:
+     - Name: `apikey`
+     - Value: `workshop-key-xyz`
+   - Click **Add Header** again:
+     - Name: `Content-Type`
+     - Value: `application/json`
+   - **Body Content Type:** JSON
+   - **JSON:**
+     ```json
+     {
+       "number": "+14155551234",
+       "text": "Hello from n8n!"
+     }
+     ```
+
+6. Click **Test workflow** (top right)
+7. Click **Execute workflow**
+
+Check your phone — you should receive "Hello from n8n!"
+
+> **🔥 Important:** Notice we used `http://evolution_api:8080` (internal Docker address), NOT `http://YOUR_DROPLET_IP:8081` (public address). Always use internal service names inside n8n workflows.
+
+---
+
+### 6. Test Qdrant (Vector Database)
+
+Open in your browser:
+```
+http://YOUR_DROPLET_IP:6333
+```
+
+You should see JSON like:
+```json
+{
+  "title": "qdrant - vector search engine",
+  "version": "1.16.3"
+}
+```
+
+Qdrant is used for AI memory (storing conversation history as vectors). You'll use it in advanced workflows.
+
+---
+
+## 🔗 Internal vs External Addresses — Critical!
+
+When building workflows **inside n8n**, always use internal Docker service names:
+
+| Service | ❌ Don't Use (Public) | ✅ Use This (Internal) |
 |---|---|---|
 | Evolution API | `http://YOUR_IP:8081` | `http://evolution_api:8080` |
 | Ollama | `http://YOUR_IP:11434` | `http://ollama:11434` |
 | Qdrant | `http://YOUR_IP:6333` | `http://qdrant:6333` |
 
-**Why?** Docker has its own internal DNS. Using the service name `evolution_api` resolves directly inside the container network. Using the public IP sends traffic out through the network card and back in, adding latency and unnecessarily exposing ports.
+**Why?**
+- Docker has internal DNS — services find each other by name
+- Internal traffic never leaves the server (faster, more secure)
+- External IPs add latency and unnecessary firewall rules
+
+**When to use external IPs?**
+- Accessing services from your browser (Evolution Manager, n8n UI, etc.)
+- Webhooks from external services (e.g., Stripe calling your n8n workflow)
 
 ---
 
-## 💻 Manual Local Installation
+## 🧪 Example: Simple AI WhatsApp Bot
 
-For running on your own machine ([Docker Desktop](https://www.docker.com/products/docker-desktop/) required):
+Now that everything is tested, let's build a real AI chatbot that responds to WhatsApp messages.
 
-```bash
-git clone https://github.com/EmreGunner/ai-automation-with-whatsapp-starter.git
-cd ai-automation-with-whatsapp-starter
-cp env.example .env
-docker compose up -d
-```
+### Step 1: Create a Webhook in n8n
 
-Access locally at `http://localhost:5678` (n8n) and `http://localhost:8082` (Evolution Manager).
+1. In n8n, create a new workflow
+2. Add a **Webhook** node
+3. Set **HTTP Method:** POST
+4. Set **Path:** `whatsapp-webhook`
+5. Copy the **Production URL** (looks like `http://YOUR_IP:5678/webhook/whatsapp-webhook`)
+
+### Step 2: Connect Evolution API to n8n
+
+1. Go to Evolution Manager → Your instance → **Webhook** tab
+2. Click **Add Webhook**
+3. Enter:
+   - **URL:** Your n8n webhook URL from Step 1
+   - **Events:** Check `messages.upsert` (received messages)
+   - **Webhook By Events:** Enable
+4. Click **Save**
+
+### Step 3: Build the AI Response Logic
+
+In your n8n workflow (after the Webhook node):
+
+1. Add **Code** node:
+   ```javascript
+   // Extract the incoming message
+   const message = $input.item.json.data.message.conversation;
+   const from = $input.item.json.data.key.remoteJid;
+   
+   return {
+     json: {
+       userMessage: message,
+       phoneNumber: from
+     }
+   };
+   ```
+
+2. Add **HTTP Request** node:
+   - **Method:** POST
+   - **URL:** `http://ollama:11434/api/generate`
+   - **JSON:**
+     ```json
+     {
+       "model": "llama3.2",
+       "prompt": "{{$json.userMessage}}",
+       "stream": false
+     }
+     ```
+
+3. Add another **Code** node:
+   ```javascript
+   // Extract AI response
+   return {
+     json: {
+       aiResponse: $input.item.json.response,
+       phoneNumber: $('Code').item.json.phoneNumber
+     }
+   };
+   ```
+
+4. Add **HTTP Request** node (to send reply):
+   - **Method:** POST
+   - **URL:** `http://evolution_api:8080/message/sendText/workshop`
+   - **Headers:** Same as before (`apikey`, `Content-Type`)
+   - **JSON:**
+     ```json
+     {
+       "number": "{{$json.phoneNumber}}",
+       "text": "{{$json.aiResponse}}"
+     }
+     ```
+
+5. Click **Save** → **Activate** (toggle in top right)
+
+**Test:** Send any message to your WhatsApp number. The bot should respond with an AI-generated answer in 3-5 seconds.
 
 ---
 
-## ⬆️ Updating
+## 🛠️ Troubleshooting
 
+### Services Not Accessible (ERR_CONNECTION_REFUSED)
+
+**Check containers:**
 ```bash
-cd /opt/workshop
-docker compose pull
-docker compose up -d --remove-orphans
-```
-
----
-
-## 🛠 Troubleshooting
-
-### "This site can't be reached" / ERR_CONNECTION_REFUSED
-
-If you can't reach any port in the browser, work through this checklist in order:
-
-**1. Check if containers are actually running**
-
-SSH in (or use the DigitalOcean browser Console), then run:
-
-```bash
+ssh root@YOUR_DROPLET_IP
 cd /opt/workshop
 docker compose ps
 ```
 
-All services should show `Up`. If not:
-
+All should show `Up`. If not:
 ```bash
 docker compose up -d
 docker compose logs --tail=50
 ```
 
-**2. Check the setup log to see where the script stopped**
-
-```bash
-cat /var/log/workshop-setup.log
-```
-
-Also check the cloud-init official log (the DO standard location):
-
-```bash
-cat /var/log/cloud-init-output.log
-```
-
-Look for any line with `ERROR` or `failed`.
-
-**3. Check the UFW firewall on the server**
-
+**Check firewall:**
 ```bash
 ufw status
 ```
 
-Required ports must show `ALLOW`. If they don't:
-
+Required ports: `22, 5678, 8081, 8082, 11434`. If missing:
 ```bash
 ufw allow 22/tcp
 ufw allow 5678/tcp
@@ -201,62 +429,117 @@ ufw allow 11434/tcp
 ufw reload
 ```
 
-**4. Check the DigitalOcean Cloud Firewall (separate from UFW)**
-
-In the DigitalOcean dashboard:
-1. Go to **Networking → Firewalls**
-2. If a firewall is assigned to your Droplet, make sure it has inbound rules allowing TCP ports `5678`, `8081`, `8082`, and `11434`
-3. If there is no cloud firewall, skip this step — UFW on the server is sufficient
-
-> DigitalOcean has two separate firewall layers: UFW runs **on the server**, the Cloud Firewall runs **at the network level** before traffic even reaches the server. Both must allow a port for it to be accessible.
+**Check DigitalOcean Cloud Firewall:**
+- Go to **Networking → Firewalls** in DO dashboard
+- If a firewall is attached to your droplet, ensure it allows the same ports
 
 ---
 
-### Ollama Crashing / n8n Returns 502 Bad Gateway
+### Ollama Returns "model not found"
 
-**Cause:** Not enough RAM. Llama 3.2 needs ~3.5 GB of RAM to load. On a 2 GB droplet the kernel will OOM-kill the container.
-
-**Fix:** Resize your Droplet to 4 GB RAM in DigitalOcean (can be done without data loss: power off → Resize → power on).
-
-To confirm the cause:
+Llama 3.2 is still downloading (~2 GB). Check progress:
 
 ```bash
-# Check available memory
-free -h
+docker compose logs ollama --tail=30
+```
 
-# Check if Ollama was killed
-docker compose logs ollama --tail=50
-# Look for "Killed" or "OOM" messages
+Wait 5-10 minutes, then try again. Pull manually:
+
+```bash
+docker exec -it workshop-ollama-1 ollama pull llama3.2
 ```
 
 ---
 
-### Evolution API Keeps Restarting — Redis Error
+### Evolution API Crash-Looping
 
-**Symptom:** `docker compose logs evolution_api` shows `[Redis] redis disconnected` in a loop.
+**Check logs:**
+```bash
+docker compose logs evolution_api --tail=30
+```
 
-**Cause:** Evolution API started before Redis was fully ready.
+Common issues:
+- **Redis connection failed:** Restart evolution_api after 10 seconds:
+  ```bash
+  docker compose restart evolution_api
+  ```
 
-**Fix:**
+- **Database auth failed:** The postgres credentials don't match. Check docker-compose.yml:
+  ```bash
+  grep -A 5 "evolution_postgres:" docker-compose.yml
+  # Should show: POSTGRES_USER=evolution_user
+  ```
+
+---
+
+### Can't SSH to Server
+
+Use the **DigitalOcean browser console**:
+1. Click your droplet → **Console** (top right)
+2. If it says "Connection lost", click **Reset**
+3. Login as `root`
+4. Run diagnostic commands from there
+
+---
+
+## 📊 Useful Commands
+
+```bash
+# View service status (auto-updates every 5 sec)
+workshop-status
+
+# View all logs in real-time
+workshop-logs
+
+# View logs for one service
+docker compose logs -f evolution_api
+
+# Restart all services
+workshop-restart
+
+# Run full health check
+workshop-health
+
+# Check disk space
+df -h
+
+# Check memory usage
+free -h
+```
+
+---
+
+## 🔄 Updating
 
 ```bash
 cd /opt/workshop
-docker compose restart evolution_api
-# Wait 15 seconds, then check
-docker compose ps
+docker compose pull
+docker compose up -d --remove-orphans
 ```
 
 ---
 
-### Can't SSH Into the Server
+## 💾 Backup & Restore
 
-If you can't SSH, use the **DigitalOcean browser console** instead:
+**Backup (creates backup.tar.gz):**
+```bash
+cd /opt/workshop
+docker compose down
+tar -czf ~/backup-$(date +%Y%m%d).tar.gz \
+  docker-compose.yml \
+  $(docker volume inspect -f '{{ .Mountpoint }}' workshop_n8n_storage) \
+  $(docker volume inspect -f '{{ .Mountpoint }}' workshop_n8n_postgres_data) \
+  $(docker volume inspect -f '{{ .Mountpoint }}' workshop_evolution_postgres_data)
+docker compose up -d
+```
 
-1. In the DigitalOcean dashboard, click your Droplet
-2. Click **Console** in the top right
-3. If the console shows `SSH Connection Lost`, click **Reset**
-4. Log in with `root` and your password
-5. From here you can run all the diagnostic commands above
+**Restore:**
+```bash
+cd /opt/workshop
+docker compose down
+tar -xzf ~/backup-20260218.tar.gz -C /
+docker compose up -d
+```
 
 ---
 
@@ -268,6 +551,19 @@ Apache License 2.0 — based on [n8n-io/self-hosted-ai-starter-kit](https://gith
 
 ## 💬 Support
 
-- [n8n Community Forum](https://community.n8n.io/)
-- [Evolution API Docs](https://doc.evolution-api.com/v2/en)
-- [GitHub Issues](https://github.com/EmreGunner/ai-automation-with-whatsapp-starter/issues)
+- **GitHub Issues:** [Report bugs here](https://github.com/EmreGunner/ai-automation-with-whatsapp-starter/issues)
+- **n8n Community:** [community.n8n.io](https://community.n8n.io/)
+- **Evolution API Docs:** [doc.evolution-api.com](https://doc.evolution-api.com/v2/en)
+
+---
+
+## 🎓 Next Steps
+
+**Ready to build real workflows?** Check out these examples:
+
+- **[PDF Summarizer Bot](examples/pdf-summarizer.md)** — Send a PDF URL, get summary on WhatsApp
+- **[Appointment Booking](examples/appointment-booking.md)** — Customers book slots via WhatsApp
+- **[Lead Qualifier](examples/lead-qualifier.md)** — Screen leads and push to CRM
+- **[Customer Support Bot](examples/support-bot.md)** — 24/7 AI helpdesk
+
+> Note: Example workflows coming soon. Star the repo to get notified!
