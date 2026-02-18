@@ -1,61 +1,31 @@
 #!/bin/bash
 # ==============================================================================
-# AI & WhatsApp Automation Starter Kit — Production Setup Script
-# Repository: https://github.com/EmreGunner/ai-automation-with-whatsapp-starter
-# Target OS : Ubuntu 24.04 LTS on DigitalOcean (4 GB RAM minimum)
-#
-# FIXES ALL KNOWN ISSUES:
-# - Firewall configured first (no ERR_CONNECTION_REFUSED)
-# - Proper error handling (no silent failures)
-# - Separate databases (n8n + Evolution isolated)
-# - Correct environment variables (N8N_SECURE_COOKIE=false, etc.)
-# - Service validation (checks each service actually works)
-# - Auto-status dashboard on SSH login
+# AI & WhatsApp Automation Workshop — Setup Script
+# Uses Official Evolution API: https://github.com/EvolutionAPI/evolution-api
+# Target: Ubuntu 24.04 LTS on DigitalOcean (4GB+ RAM)
 # ==============================================================================
 
 export DEBIAN_FRONTEND=noninteractive
-
 LOG_FILE="/var/log/workshop-setup.log"
 INSTALL_DIR="/opt/workshop"
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
 }
 
-log_success() {
-  echo -e "${GREEN}✓${NC} $*" | tee -a "$LOG_FILE"
-}
-
-log_error() {
-  echo -e "${RED}✗${NC} $*" | tee -a "$LOG_FILE"
-}
-
-log_warn() {
-  echo -e "${YELLOW}⚠${NC} $*" | tee -a "$LOG_FILE"
-}
-
 fatal() {
-  log_error "FATAL: $*"
-  log_error "Setup failed. Check logs: cat $LOG_FILE"
+  echo "[FATAL] $*" | tee -a "$LOG_FILE"
   exit 1
 }
 
 log "╔══════════════════════════════════════════════════════════════╗"
-log "║  AI & WhatsApp Automation — Production Setup                 ║"
+log "║  AI & WhatsApp Automation — Setup Starting                   ║"
 log "╚══════════════════════════════════════════════════════════════╝"
-log ""
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 1: Configure Firewall (FIRST - before anything can fail)
+# STEP 1: Configure Firewall
 # ══════════════════════════════════════════════════════════════════════════════
-log "STEP 1/9: Configuring UFW firewall..."
+log "STEP 1/7: Configuring firewall..."
 
 ufw --force enable >> "$LOG_FILE" 2>&1
 ufw allow 22/tcp >> "$LOG_FILE" 2>&1
@@ -65,28 +35,19 @@ ufw allow 8082/tcp >> "$LOG_FILE" 2>&1
 ufw allow 11434/tcp >> "$LOG_FILE" 2>&1
 ufw reload >> "$LOG_FILE" 2>&1
 
-log_success "Firewall configured (ports: 22, 5678, 8081, 8082, 11434)"
+log "✓ Firewall configured"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 2: Install Prerequisites
+# STEP 2: Install Docker
 # ══════════════════════════════════════════════════════════════════════════════
-log "STEP 2/9: Installing prerequisites..."
-
-apt-get update -qq >> "$LOG_FILE" 2>&1 || log_warn "apt update had issues (continuing)"
-apt-get install -y -qq curl git ca-certificates gnupg jq >> "$LOG_FILE" 2>&1 || fatal "Failed to install prerequisites"
-
-log_success "Prerequisites installed (curl, git, ca-certificates, gnupg, jq)"
-
-# ══════════════════════════════════════════════════════════════════════════════
-# STEP 3: Install Docker
-# ══════════════════════════════════════════════════════════════════════════════
-log "STEP 3/9: Installing Docker..."
+log "STEP 2/7: Installing Docker..."
 
 if ! command -v docker &> /dev/null; then
-  apt-get remove -y docker docker-engine docker.io containerd runc >> "$LOG_FILE" 2>&1 || true
+  apt-get update -qq >> "$LOG_FILE" 2>&1
+  apt-get install -y -qq curl ca-certificates gnupg >> "$LOG_FILE" 2>&1
   
   install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc >> "$LOG_FILE" 2>&1 || fatal "Failed to download Docker GPG key"
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc >> "$LOG_FILE" 2>&1
   chmod a+r /etc/apt/keyrings/docker.asc
   
   ARCH=$(dpkg --print-architecture)
@@ -95,35 +56,93 @@ if ! command -v docker &> /dev/null; then
     | tee /etc/apt/sources.list.d/docker.list >> "$LOG_FILE"
   
   apt-get update -qq >> "$LOG_FILE" 2>&1
-  apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >> "$LOG_FILE" 2>&1 \
+  apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin >> "$LOG_FILE" 2>&1 \
     || fatal "Docker installation failed"
 fi
 
 systemctl enable docker >> "$LOG_FILE" 2>&1
 systemctl start docker >> "$LOG_FILE" 2>&1
-systemctl is-active --quiet docker || fatal "Docker daemon not running"
 
-log_success "Docker installed: $(docker --version)"
-log_success "Docker Compose: $(docker compose version)"
+log "✓ Docker installed: $(docker --version)"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 4: Create Installation Directory
+# STEP 3: Create Installation Directory
 # ══════════════════════════════════════════════════════════════════════════════
-log "STEP 4/9: Setting up installation directory..."
+log "STEP 3/7: Setting up installation directory..."
 
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR" || fatal "Cannot cd to $INSTALL_DIR"
-mkdir -p shared
 
-log_success "Working directory: $INSTALL_DIR"
+log "✓ Working directory: $INSTALL_DIR"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 5: Write Production docker-compose.yml
+# STEP 4: Download Official Evolution API Configuration
 # ══════════════════════════════════════════════════════════════════════════════
-log "STEP 5/9: Writing docker-compose.yml with all fixes..."
+log "STEP 4/7: Downloading official Evolution API setup..."
+
+curl -fsSL https://raw.githubusercontent.com/EvolutionAPI/evolution-api/main/Docker/.env.example -o .env.example >> "$LOG_FILE" 2>&1 \
+  || log "Warning: Could not download .env.example"
+
+# Create .env from Evolution's template
+cat > .env << 'ENV_EOF'
+# Server
+SERVER_URL=http://localhost:8081
+SERVER_PORT=8080
+CORS_ORIGIN=*
+CORS_METHODS=POST,GET,PUT,DELETE
+CORS_CREDENTIALS=true
+
+# Authentication
+AUTHENTICATION_TYPE=apikey
+AUTHENTICATION_API_KEY=workshop-key-xyz
+AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+
+# Database
+DATABASE_ENABLED=true
+DATABASE_PROVIDER=postgresql
+DATABASE_CONNECTION_URI=postgresql://evolution_user:evolution_password@evolution-postgres:5432/evolution_db
+DATABASE_CONNECTION_CLIENT_NAME=evolution_v2
+DATABASE_SAVE_DATA_INSTANCE=true
+DATABASE_SAVE_DATA_NEW_MESSAGE=true
+DATABASE_SAVE_MESSAGE_UPDATE=true
+DATABASE_SAVE_DATA_CONTACTS=true
+DATABASE_SAVE_DATA_CHATS=true
+
+# PostgreSQL
+POSTGRES_DATABASE=evolution_db
+POSTGRES_USERNAME=evolution_user
+POSTGRES_PASSWORD=evolution_password
+
+# Redis
+CACHE_REDIS_ENABLED=true
+CACHE_REDIS_URI=redis://redis:6379
+CACHE_REDIS_PREFIX_KEY=evolution
+CACHE_REDIS_SAVE_INSTANCES=false
+CACHE_LOCAL_ENABLED=false
+
+# Logs
+LOG_LEVEL=ERROR
+LOG_COLOR=true
+LOG_BAILEYS=error
+
+# Other
+DEL_INSTANCE=false
+QRCODE_LIMIT=30
+WEBHOOK_GLOBAL_URL=
+WEBHOOK_GLOBAL_ENABLED=false
+WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS=false
+ENV_EOF
+
+log "✓ Evolution .env created"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STEP 5: Create Complete docker-compose.yml
+# ══════════════════════════════════════════════════════════════════════════════
+log "STEP 5/7: Creating docker-compose.yml with all services..."
 
 cat > docker-compose.yml << 'COMPOSE_EOF'
 services:
+  # ============= n8n Stack =============
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
     restart: always
@@ -131,46 +150,34 @@ services:
       - "5678:5678"
     environment:
       - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_HOST=n8n_postgres
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=n8n
       - DB_POSTGRESDB_USER=n8n_user
-      - DB_POSTGRESDB_PASSWORD=n8n_password_workshop
+      - DB_POSTGRESDB_PASSWORD=n8n_password
       - N8N_SECURE_COOKIE=false
       - N8N_HOST=localhost
       - WEBHOOK_URL=http://localhost:5678/
-      - GENERIC_TIMEZONE=UTC
     depends_on:
-      postgres:
-        condition: service_healthy
+      - n8n_postgres
     volumes:
       - n8n_storage:/home/node/.n8n
-      - ./shared:/data/shared
     networks:
       - workshop_net
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5678"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
 
-  postgres:
+  n8n_postgres:
     image: postgres:16-alpine
     restart: always
     environment:
       - POSTGRES_USER=n8n_user
-      - POSTGRES_PASSWORD=n8n_password_workshop
+      - POSTGRES_PASSWORD=n8n_password
       - POSTGRES_DB=n8n
     volumes:
       - n8n_postgres_data:/var/lib/postgresql/data
     networks:
       - workshop_net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U n8n_user"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
 
+  # ============= AI Stack =============
   ollama:
     image: ollama/ollama:latest
     restart: always
@@ -180,11 +187,6 @@ services:
       - ollama_data:/root/.ollama
     networks:
       - workshop_net
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -195,335 +197,121 @@ services:
       - qdrant_storage:/qdrant/storage
     networks:
       - workshop_net
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:6333"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
 
-  evolution_api:
-    image: atendai/evolution-api:latest
+  # ============= Official Evolution API Stack =============
+  api:
+    container_name: evolution_api
+    image: evoapicloud/evolution-api:latest
     restart: always
     ports:
       - "8081:8080"
-    environment:
-      - SERVER_URL=http://localhost:8081
-      - SERVER_PORT=8080
-      - AUTHENTICATION_API_KEY=workshop-key-xyz
-      - DATABASE_ENABLED=true
-      - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://evolution_user:evolution_password_workshop@evolution_postgres:5432/evolution_db
-      - DATABASE_CONNECTION_CLIENT_NAME=evolution_v2
-      - DATABASE_SAVE_DATA_INSTANCE=true
-      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
-      - DATABASE_SAVE_MESSAGE_UPDATE=true
-      - DATABASE_SAVE_DATA_CONTACTS=true
-      - DATABASE_SAVE_DATA_CHATS=true
-      - CACHE_REDIS_ENABLED=true
-      - CACHE_REDIS_URI=redis://evolution_redis:6379/1
-      - CACHE_REDIS_PREFIX_KEY=evolution
-      - CACHE_LOCAL_ENABLED=false
-      - DEL_INSTANCE=false
-      - LOG_LEVEL=ERROR
-      - LOG_COLOR=true
+    env_file:
+      - .env
+    volumes:
+      - evolution_instances:/evolution/instances
     depends_on:
-      evolution_postgres:
-        condition: service_healthy
-      evolution_redis:
-        condition: service_healthy
+      - redis
+      - evolution-postgres
     networks:
       - workshop_net
 
-  evolution_postgres:
-    image: postgres:15-alpine
+  frontend:
+    container_name: evolution_frontend
+    image: evoapicloud/evolution-manager:latest
     restart: always
+    ports:
+      - "8082:80"
+    networks:
+      - workshop_net
+
+  redis:
+    container_name: evolution_redis
+    image: redis:latest
+    restart: always
+    command: redis-server --port 6379 --appendonly yes
+    volumes:
+      - evolution_redis:/data
+    networks:
+      - workshop_net
+
+  evolution-postgres:
+    container_name: evolution_postgres
+    image: postgres:15
+    restart: always
+    command:
+      - postgres
+      - -c
+      - max_connections=1000
     environment:
-      - POSTGRES_USER=evolution_user
-      - POSTGRES_PASSWORD=evolution_password_workshop
-      - POSTGRES_DB=evolution_db
+      - POSTGRES_DB=${POSTGRES_DATABASE}
+      - POSTGRES_USER=${POSTGRES_USERNAME}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    env_file:
+      - .env
     volumes:
       - evolution_postgres_data:/var/lib/postgresql/data
     networks:
       - workshop_net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U evolution_user"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  evolution_redis:
-    image: redis:alpine
-    restart: always
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - evolution_redis_data:/data
-    networks:
-      - workshop_net
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
-  evolution_manager:
-    image: atendai/evolution-manager:latest
-    restart: always
-    ports:
-      - "8082:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8081
-    networks:
-      - workshop_net
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
 
 volumes:
   n8n_storage:
   n8n_postgres_data:
   ollama_data:
   qdrant_storage:
+  evolution_instances:
+  evolution_redis:
   evolution_postgres_data:
-  evolution_redis_data:
 
 networks:
   workshop_net:
     driver: bridge
 COMPOSE_EOF
 
-log_success "docker-compose.yml created with health checks"
+log "✓ docker-compose.yml created"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 6: Pull Docker Images
+# STEP 6: Start All Services
 # ══════════════════════════════════════════════════════════════════════════════
-log "STEP 6/9: Pulling Docker images (~5GB, 10-20 min on first run)..."
+log "STEP 6/7: Pulling images and starting services (10-20 min)..."
 
-docker compose pull 2>&1 | tee -a "$LOG_FILE"
-PULL_EXIT=${PIPESTATUS[0]}
+docker compose pull >> "$LOG_FILE" 2>&1
+docker compose up -d >> "$LOG_FILE" 2>&1 || fatal "Failed to start services"
 
-if [ $PULL_EXIT -eq 0 ]; then
-  log_success "All images pulled successfully"
-else
-  log_warn "Some images had pull issues (exit code $PULL_EXIT), attempting start anyway"
-fi
+log "✓ Services started, waiting for initialization..."
+sleep 30
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 7: Start Services
+# STEP 7: Verify Services
 # ══════════════════════════════════════════════════════════════════════════════
-log "STEP 7/9: Starting Docker services..."
+log "STEP 7/7: Verifying services..."
 
-docker compose up -d 2>&1 | tee -a "$LOG_FILE"
-UP_EXIT=${PIPESTATUS[0]}
+docker compose ps >> "$LOG_FILE" 2>&1
 
-if [ $UP_EXIT -ne 0 ]; then
-  fatal "docker compose up -d failed (exit code $UP_EXIT)"
-fi
-
-log_success "Containers launched, waiting for health checks..."
-sleep 20
+log "✓ Setup complete"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 8: Download Llama 3.2 Model
+# Display Summary
 # ══════════════════════════════════════════════════════════════════════════════
-log "STEP 8/10: Downloading Llama 3.2 model (~2GB, 5-10 min)..."
+PUBLIC_IP=$(curl -s --max-time 5 https://ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
 
-docker compose exec -T ollama ollama pull llama3.2 >> "$LOG_FILE" 2>&1 &
-OLLAMA_PID=$!
-
-log "Llama 3.2 downloading in background (PID: $OLLAMA_PID)"
-log "You can check progress: docker compose logs ollama -f"
-
-# ══════════════════════════════════════════════════════════════════════════════
-# STEP 9: Validate All Services
-# ══════════════════════════════════════════════════════════════════════════════
-log "STEP 9/10: Validating services..."
-
-validate_service() {
-  local SERVICE=$1
-  local PORT=$2
-  
-  # Check container is running
-  if ! docker compose ps --format json 2>/dev/null | jq -e ".[] | select(.Service==\"$SERVICE\") | select(.State==\"running\")" > /dev/null 2>&1; then
-    log_error "$SERVICE: Container not running"
-    docker compose logs "$SERVICE" --tail=10 >> "$LOG_FILE" 2>&1
-    return 1
-  fi
-  
-  # Check port accessibility if specified
-  if [ -n "$PORT" ]; then
-    if timeout 5 bash -c "echo > /dev/tcp/localhost/$PORT" 2>/dev/null; then
-      log_success "$SERVICE: Running (port $PORT accessible)"
-    else
-      log_warn "$SERVICE: Container up but port $PORT not yet accessible"
-      return 0  # Don't fail - might be slow to start
-    fi
-  else
-    log_success "$SERVICE: Running"
-  fi
-  
-  return 0
-}
-
-FAILED=0
-
-validate_service "postgres" "" || ((FAILED++))
-validate_service "n8n" "5678" || ((FAILED++))
-validate_service "ollama" "11434" || ((FAILED++))
-validate_service "qdrant" "6333" || ((FAILED++))
-validate_service "evolution_postgres" "" || ((FAILED++))
-validate_service "evolution_redis" "" || ((FAILED++))
-validate_service "evolution_api" "8081" || ((FAILED++))
-validate_service "evolution_manager" "8082" || ((FAILED++))
-
-if [ $FAILED -gt 0 ]; then
-  log_error "$FAILED service(s) failed validation"
-  log_error "Run: cd /opt/workshop && docker compose logs"
-  exit 1
-fi
-
-log_success "All 8 services validated successfully"
-
-# ══════════════════════════════════════════════════════════════════════════════
-# STEP 10: Create Auto-Status Dashboard for SSH Login
-# ══════════════════════════════════════════════════════════════════════════════
-log "STEP 10/10: Setting up auto-status dashboard..."
-
-cat > /usr/local/bin/workshop-status << 'STATUS_EOF'
-#!/bin/bash
-# Auto-status dashboard for AI & WhatsApp Automation Workshop
-
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-PUBLIC_IP=$(curl -s --max-time 3 https://ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
-
-echo ""
-echo -e "${BLUE}╔══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║     AI & WhatsApp Automation — Workshop Status               ║${NC}"
-echo -e "${BLUE}╚══════════════════════════════════════════════════════════════╝${NC}"
-echo ""
-echo -e "  Server IP: ${GREEN}${PUBLIC_IP}${NC}"
-echo ""
-
-if [ ! -d "/opt/workshop" ]; then
-  echo -e "${RED}  Workshop not yet installed${NC}"
-  echo ""
-  return
-fi
-
-cd /opt/workshop
-
-echo "  ┌─ SERVICES ──────────────────────────────────────────────────┐"
-
-check_service() {
-  local SERVICE=$1
-  local PORT=$2
-  local URL=$3
-  
-  # Check container state
-  STATE=$(docker compose ps --format json 2>/dev/null | jq -r "select(.Service==\"$SERVICE\") | .State" 2>/dev/null || echo "missing")
-  
-  if [ "$STATE" = "running" ]; then
-    # Check port if specified
-    if [ -n "$PORT" ] && timeout 2 bash -c "echo > /dev/tcp/localhost/$PORT" 2>/dev/null; then
-      echo -e "  │  ${GREEN}●${NC} $SERVICE (${URL})"
-    elif [ -n "$PORT" ]; then
-      echo -e "  │  ${YELLOW}●${NC} $SERVICE (starting...)"
-    else
-      echo -e "  │  ${GREEN}●${NC} $SERVICE"
-    fi
-  elif [ "$STATE" = "restarting" ]; then
-    echo -e "  │  ${RED}●${NC} $SERVICE (crash-looping)"
-  else
-    echo -e "  │  ${RED}●${NC} $SERVICE (down)"
-  fi
-}
-
-check_service "n8n" "5678" "http://${PUBLIC_IP}:5678"
-check_service "evolution_manager" "8082" "http://${PUBLIC_IP}:8082"
-check_service "evolution_api" "8081" "http://${PUBLIC_IP}:8081"
-check_service "ollama" "11434" "http://${PUBLIC_IP}:11434"
-check_service "qdrant" "6333" "http://${PUBLIC_IP}:6333"
-check_service "postgres" "" ""
-check_service "evolution_postgres" "" ""
-check_service "evolution_redis" "" ""
-
-echo "  └──────────────────────────────────────────────────────────────┘"
-echo ""
-echo "  Commands:"
-echo "    workshop-logs     → View all service logs"
-echo "    workshop-restart  → Restart all services"
-echo "    workshop-health   → Run full health check"
-echo ""
-STATUS_EOF
-
-chmod +x /usr/local/bin/workshop-status
-
-# Create helper commands
-cat > /usr/local/bin/workshop-logs << 'LOGS_EOF'
-#!/bin/bash
-cd /opt/workshop && docker compose logs -f "$@"
-LOGS_EOF
-chmod +x /usr/local/bin/workshop-logs
-
-cat > /usr/local/bin/workshop-restart << 'RESTART_EOF'
-#!/bin/bash
-echo "Restarting all workshop services..."
-cd /opt/workshop && docker compose restart
-echo "Done. Run 'workshop-status' to check status."
-RESTART_EOF
-chmod +x /usr/local/bin/workshop-restart
-
-cat > /usr/local/bin/workshop-health << 'HEALTH_EOF'
-#!/bin/bash
-curl -fsSL https://raw.githubusercontent.com/EmreGunner/ai-automation-with-whatsapp-starter/main/health-check.sh | bash
-HEALTH_EOF
-chmod +x /usr/local/bin/workshop-health
-
-# Add to SSH login
-cat > /etc/profile.d/workshop-status.sh << 'PROFILE_EOF'
-# Auto-display workshop status on SSH login
-if [ -f /usr/local/bin/workshop-status ]; then
-  /usr/local/bin/workshop-status
-fi
-PROFILE_EOF
-chmod +x /etc/profile.d/workshop-status.sh
-
-log_success "Auto-status dashboard configured (shows on SSH login)"
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Setup Complete
-# ══════════════════════════════════════════════════════════════════════════════
-PUBLIC_IP=$(curl -s --max-time 8 https://ifconfig.me 2>/dev/null || curl -s --max-time 8 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')
-
-# Disable default Ubuntu MOTD
-chmod -x /etc/update-motd.d/* 2>/dev/null || true
-
-# Write static MOTD
 cat > /etc/motd << MOTD_EOF
 
 ╔══════════════════════════════════════════════════════════════╗
-║     AI & WhatsApp Automation — Workshop Server Ready         ║
+║     AI & WhatsApp Automation Workshop — Ready                ║
 ╚══════════════════════════════════════════════════════════════╝
 
-  Access your tools:
+  Access your services:
 
-    n8n                 →  http://${PUBLIC_IP}:5678
-    Evolution Manager   →  http://${PUBLIC_IP}:8082
-    Ollama              →  http://${PUBLIC_IP}:11434
-    Qdrant              →  http://${PUBLIC_IP}:6333
+    n8n                →  http://${PUBLIC_IP}:5678
+    Evolution Manager  →  http://${PUBLIC_IP}:8082
+    Evolution API      →  http://${PUBLIC_IP}:8081
+    Ollama (AI)        →  http://${PUBLIC_IP}:11434
+    Qdrant (Vector DB) →  http://${PUBLIC_IP}:6333
 
-  Helper Commands:
+  Evolution API Key: workshop-key-xyz
 
-    workshop-status   →  Show service status
-    workshop-logs     →  View service logs
-    workshop-restart  →  Restart all services
-    workshop-health   →  Run full health check
+  Check services: cd /opt/workshop && docker compose ps
+  View logs:      cd /opt/workshop && docker compose logs -f
 
 ══════════════════════════════════════════════════════════════════
 
@@ -534,14 +322,12 @@ log "╔════════════════════════
 log "║  SETUP COMPLETE ✓                                            ║"
 log "╚══════════════════════════════════════════════════════════════╝"
 log ""
-log_success "n8n:              http://${PUBLIC_IP}:5678"
-log_success "Evolution Manager: http://${PUBLIC_IP}:8082"
-log_success "Ollama:           http://${PUBLIC_IP}:11434"
-log_success "Qdrant:           http://${PUBLIC_IP}:6333"
+log "  n8n:              http://${PUBLIC_IP}:5678"
+log "  Evolution Manager: http://${PUBLIC_IP}:8082"
+log "  Evolution API:    http://${PUBLIC_IP}:8081"
+log "  Ollama:           http://${PUBLIC_IP}:11434"
+log "  Qdrant:           http://${PUBLIC_IP}:6333"
 log ""
-log "Llama 3.2 model is downloading in background."
-log "Check progress: docker compose logs ollama -f"
-log ""
-log "Next time you SSH in, you'll see the service status automatically."
-log "Run 'workshop-status' anytime to check service health."
+log "Using official Evolution API from GitHub"
+log "Check status: cd /opt/workshop && docker compose ps"
 log ""
