@@ -12,7 +12,7 @@ One-click setup on DigitalOcean. No coding required. Built on [n8n-io/self-hoste
 |---|---|---|
 | **n8n** | Workflow automation with 400+ integrations | 5678 |
 | **Evolution API** | WhatsApp bridge (send/receive messages, media, webhooks) | 8081 |
-| **Evolution Manager** | Web UI for managing WhatsApp instances | 8082 |
+| **Evolution Manager** | Web UI for managing WhatsApp instances | 8081/manager OR 8082 |
 | **Ollama** | Local LLM (Llama 3.2) — no API keys needed | 11434 |
 | **Qdrant** | Vector database for AI memory | 6333 |
 | **PostgreSQL ×2** | Isolated databases (n8n + Evolution) | internal |
@@ -66,6 +66,7 @@ The setup takes **15-20 minutes**. The script automatically:
 - Installs Docker
 - Pulls all images (~5 GB)
 - Starts all 8 services
+- Downloads Llama 3.2 model (~2 GB, in background)
 - Validates everything works
 
 When the droplet shows **Active**, copy your **Droplet IP** — you'll need it for every URL below.
@@ -74,15 +75,23 @@ When the droplet shows **Active**, copy your **Droplet IP** — you'll need it f
 
 ## ✅ Step-by-Step Setup & Testing
 
-### 1. Verify Services Are Running
+### Quick Health Check
 
-**Option A: Via Health Check (Recommended)**
+Before going through individual tests, run this one-liner to check if everything is working:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/EmreGunner/ai-automation-with-whatsapp-starter/main/health-check.sh | bash
 ```
 
-You should see all green checkmarks ✓.
+You should see all green checkmarks ✓. If anything shows red ✗, see the [Troubleshooting](#️-troubleshooting) section.
+
+---
+
+### 1. Verify Services Are Running
+
+**Option A: Via Health Check Script**
+
+Run the health check above for a comprehensive report.
 
 **Option B: Via SSH**
 
@@ -115,7 +124,7 @@ http://YOUR_DROPLET_IP:11434
 
 You should see: `Ollama is running`
 
-**Test the AI with a real question:**
+**Test the AI with a question:**
 
 ```bash
 ssh root@YOUR_DROPLET_IP
@@ -136,11 +145,34 @@ Response example:
 }
 ```
 
-If you get `model not found`, Llama 3.2 is still downloading. Wait 5 minutes and try again. Check progress:
+> **Note:** Llama 3.2 (~2GB) downloads automatically during setup. If you created your droplet less than 20 minutes ago and get `model not found`, wait 5 more minutes for the download to complete.
+
+**Test Ollama from your browser (without SSH):**
+
+You can also call Ollama directly from your local machine or browser console:
 
 ```bash
-docker compose logs ollama --tail=20
+# From your local terminal (not SSH)
+curl -X POST http://YOUR_DROPLET_IP:11434/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "llama3.2",
+    "prompt": "What is artificial intelligence?",
+    "stream": false
+  }'
 ```
+
+Or use a tool like Postman:
+- **Method:** POST
+- **URL:** `http://YOUR_DROPLET_IP:11434/api/generate`
+- **Body (JSON):**
+  ```json
+  {
+    "model": "llama3.2",
+    "prompt": "Explain AI in simple terms",
+    "stream": false
+  }
+  ```
 
 ---
 
@@ -148,9 +180,16 @@ docker compose logs ollama --tail=20
 
 #### 3.1 Log In to Evolution Manager
 
-Open in your browser:
+Evolution Manager can be accessed at **two URLs** (both work):
+
+**Option A (Recommended):**
 ```
 http://YOUR_DROPLET_IP:8082
+```
+
+**Option B (Alternative):**
+```
+http://YOUR_DROPLET_IP:8081/manager
 ```
 
 You'll see a login screen. Enter:
@@ -274,6 +313,42 @@ Check your phone — you should receive "Hello from n8n!"
 
 > **🔥 Important:** Notice we used `http://evolution_api:8080` (internal Docker address), NOT `http://YOUR_DROPLET_IP:8081` (public address). Always use internal service names inside n8n workflows.
 
+#### 5.3 Add Ollama AI to n8n Workflow
+
+Let's test the AI engine by adding Ollama to a workflow:
+
+1. Create a new workflow in n8n
+2. Add **Manual Trigger** node
+3. Add **HTTP Request** node
+4. Configure:
+   - **Method:** POST
+   - **URL:** `http://ollama:11434/api/generate`
+   - **Body Content Type:** JSON
+   - **JSON:**
+     ```json
+     {
+       "model": "llama3.2",
+       "prompt": "Explain AI in one sentence",
+       "stream": false
+     }
+     ```
+5. Click **Test workflow** → **Execute workflow**
+
+You'll see a response in the output panel with `"response": "..."` containing the AI's answer.
+
+**Extract just the AI response:**
+
+Add a **Code** node after the HTTP Request:
+```javascript
+return {
+  json: {
+    aiAnswer: $input.item.json.response
+  }
+};
+```
+
+Now you can use `{{ $json.aiAnswer }}` in any downstream node (like sending it to WhatsApp, email, Slack, etc.).
+
 ---
 
 ### 6. Test Qdrant (Vector Database)
@@ -310,9 +385,15 @@ When building workflows **inside n8n**, always use internal Docker service names
 - Internal traffic never leaves the server (faster, more secure)
 - External IPs add latency and unnecessary firewall rules
 
-**When to use external IPs?**
-- Accessing services from your browser (Evolution Manager, n8n UI, etc.)
-- Webhooks from external services (e.g., Stripe calling your n8n workflow)
+**When to use public IPs?**
+- ✅ Accessing web UIs from your browser (Evolution Manager, n8n UI)
+- ✅ Testing Ollama from your local machine (outside the server)
+- ✅ Webhooks from external services calling into your server (e.g., Stripe → n8n)
+- ✅ Sending WhatsApp messages from external apps to Evolution API
+
+**When to use internal service names?**
+- ✅ **Inside n8n workflows** connecting to Evolution API, Ollama, or Qdrant
+- ✅ Any service-to-service communication on the same Docker network
 
 ---
 
@@ -437,17 +518,22 @@ ufw reload
 
 ### Ollama Returns "model not found"
 
-Llama 3.2 is still downloading (~2 GB). Check progress:
+Llama 3.2 is still downloading (~2 GB, takes 5-10 minutes during initial setup).
+
+**Check if download is complete:**
 
 ```bash
-docker compose logs ollama --tail=30
+cd /opt/workshop
+docker compose logs ollama --tail=30 | grep -i "success\|error"
 ```
 
-Wait 5-10 minutes, then try again. Pull manually:
+If you see "success", the model is ready. If you see errors or nothing, the download may have failed. Restart it:
 
 ```bash
-docker exec -it workshop-ollama-1 ollama pull llama3.2
+docker compose exec ollama ollama pull llama3.2
 ```
+
+Wait for "success", then test again.
 
 ---
 
@@ -485,6 +571,9 @@ Use the **DigitalOcean browser console**:
 ## 📊 Useful Commands
 
 ```bash
+# Quick health check (run from anywhere)
+curl -fsSL https://raw.githubusercontent.com/EmreGunner/ai-automation-with-whatsapp-starter/main/health-check.sh | bash
+
 # View service status (auto-updates every 5 sec)
 workshop-status
 
@@ -497,7 +586,7 @@ docker compose logs -f evolution_api
 # Restart all services
 workshop-restart
 
-# Run full health check
+# Run full health check (if workshop-health command exists)
 workshop-health
 
 # Check disk space
@@ -505,6 +594,9 @@ df -h
 
 # Check memory usage
 free -h
+
+# Test Ollama from anywhere
+curl -X POST http://YOUR_DROPLET_IP:11434/api/generate -d '{"model":"llama3.2","prompt":"Hello","stream":false}'
 ```
 
 ---
